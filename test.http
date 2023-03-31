@@ -1,0 +1,8 @@
+POST http://localhost:8080/create HTTP/1.1
+Content-Type: application/json
+
+{
+  "name": "name",
+  "content": "test content",
+  "extension": ".txt"
+}
