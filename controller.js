@@ -1,33 +1,58 @@
-const fs = require('fs');
-const path = require('path');
+const FileDataDto = require('./FileDataDto');
+const {checkFileExists, createFile, readFile, updateFile, deleteFile} = require('./fileMethods');
 
-const DEFAULT_PATH = "./uploads/"
 const METHOD_POST = "POST";
 
-const CODE_FILE_ALREADY_EXISTS = "Файл уже существует";
+const CODE_FILE_ALREADY_EXISTS = "File already exists";
+const CODE_FILE_DOESNT_EXISTS = "File doesnt exists";
 
-const checkFileExists = function (fileName) {
-    try {
-        fs.accessSync(DEFAULT_PATH + fileName, fs.constants.F_OK);
-        return true;
-    } catch (e) {
-        return false;
+const fileError = function (res, error) {
+    res.statusCode = 400;
+    res.setHeader('Content-Type', 'text/plain');
+    res.end(error);
+}
+
+const create = function (createDataDto, res) {
+    if (checkFileExists(createDataDto.fullName())) {
+        fileError(res, CODE_FILE_ALREADY_EXISTS);
+        return;
     }
+    createFile(createDataDto, res);
+};
+
+
+const read = function (createDataDto, res) {
+    if (!checkFileExists(createDataDto.fullName())) {
+        fileError(res, CODE_FILE_DOESNT_EXISTS);
+        return;
+    }
+    readFile(createDataDto, res);
 
 };
 
-const createFile = function (res) {
-    let isExists = checkFileExists('test.txt')
-    if (isExists) {
-        return CODE_FILE_ALREADY_EXISTS;
+const update = function (createDataDto, res) {
+
+    if (!checkFileExists(createDataDto.fullName())) {
+        fileError(res, CODE_FILE_DOESNT_EXISTS);
+        return;
     }
-    return "1234";
-}
+    updateFile(createDataDto, res);
 
+};
 
+const destroy = function (createDataDto, res) {
+    if (!checkFileExists(createDataDto.fullName())) {
+        fileError(res, CODE_FILE_DOESNT_EXISTS);
+        return;
+    }
+    deleteFile(createDataDto, res);
+};
 
 const urls = new Map();
-urls.set('/create', createFile)
+urls.set('/create', create)
+urls.set('/read', read)
+urls.set('/update', update)
+urls.set('/delete', destroy)
 
 const badRequest = function (res) {
     res.statusCode = 400;
@@ -50,9 +75,20 @@ module.exports.resolveAction = function (req, res) {
         badRequest(res);
         return;
     }
-    let fun = urls.get(req.url);
-    let answer = fun(req);
-    res.statusCode = 200;
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    res.end(answer);
+    let body = '';
+
+    req.on('data', (chunk) => {
+        body += chunk;
+    });
+
+    req.on('end', () => {
+        try {
+            let {name, content, extension} = JSON.parse(body);
+            let createDataDto = new FileDataDto(name, content, extension);
+            let fun = urls.get(req.url);
+            fun(createDataDto, res);
+        } catch (error) {
+            badRequest(res)
+        }
+    });
 };
